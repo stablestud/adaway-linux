@@ -14,41 +14,48 @@ HOSTSORIG="/etc/.hosts.original"
 TMPDIR="/tmp/adaway-linux"
 #
 
-# Get the location of the script
+# Get the location of the script.
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 
-trap error ERR  # Trap errors and runs error function
-trap error EXIT # Trap exit and runs error function
+#set -x
+set -o pipefail
+set -o errtrace
+trap 'error ${LINENO} $?' ERR EXIT  # Trap errors and runs error function.
+
 
 function root() {
-## Checks for root
+  ## Checks for root.
   if [ "${UID}" != "0" ] ; then
     echo "[!] This script must be run as root." 1>&2
-    trap '' EXIT # Unhook exit - exit 1 will now instantly terminates the script
+    trap '' EXIT # Unhook exit - exit 1 will now instantly terminates the script.
     exit 1
   fi
   return 0
 }
 
+
 function cleanup() {
-## Clean leftovers which are not required anymore
+  ## Clean leftovers which are not required anymore.
   echo "[i] Cleaning up..."
-  rm -rf "${TMPDIR}" 2>&1 1>/dev/null # Remove the temporary folder
+  rm -rf "${TMPDIR}" 1>/dev/null 2>&1  # Remove the temporary folder.
   return 0
 }
 
+
 function error() {
-## To catch unpredicted errors.
+  ## To catch unpredicted errors and exits.
+  echo "${0}: line ${1}: exit ${2}"
   echo "[!] Upps, something went wrong." 1>&2
   echo "[@] Please report bugs to:" 1>&2
   echo "[@] https://github.com/sedrubal/adaway-linux/issues" 1>&2
-  cleanup # Execute the cleanup function
+  cleanup # Execute the cleanup function.
   trap '' EXIT
   exit 1
 }
 
+
 function helpme() {
-## Show help
+  ## Show help
   echo "Welcome to adaway-linux, a small script to add domains hosting ads to the hosts file to block them."
   echo ""
   echo "[!] Please run ./install.sh before using this! It will backup your original /etc/hosts"
@@ -71,13 +78,12 @@ function simulate() {
 
 
 function prepare() {
-## Prepare folders etc.
-  # Delete previous tmp folder
+  ## Prepare folders etc.
+  # Delete previous tmp folder.
   if [ -d "${TMPDIR}" ]; then
     cleanup
   fi
-
-  # Create new tmp folder
+  # Create new tmp folder.
   echo "[i] Creating temporary directory ${TMPDIR}"
   mkdir -p "${TMPDIR}" || exit 1
   return 0
@@ -85,18 +91,17 @@ function prepare() {
 
 
 function fetch() {
-## Download and save the hosts
+  ## Download and save the hosts.
   # Add domains from hosts-server listed in hostssources.lst
-  declare -i count=0;
-  declare -i tcount=0;
-  while read src; do
-    (( tcount++ ))
+  count=0; tcount=0; # Used to print out how many hosts beeen downloaded/total [3/4]
+  while read -r src; do
+    ((tcount+=1))
     if [[ "${src}" != "#"* ]] ; then
       echo "[i] Downloading and cleaning up ${src}"
       if type curl 2>/dev/null 1>&2; then # Checks whether curl is installed, if not switch to wget.
-        DOWNLOAD_CMD=$(curl --progress-bar -L --connect-timeout 30 --retry 1 "${src}" )
+        DOWNLOAD_CMD=$(curl --progress-bar -L --connect-timeout 30 --fail --retry 1 "${src}" ) || echo "[!] curl failed @ ${src}" 1>&2
       else
-        DOWNLOAD_CMD=$(wget "${src}" -nv --show-progress --read-timeout=30 --timeout=30 -t 1 -L -O - )
+        DOWNLOAD_CMD=$(wget "${src}" -nv --show-progress --read-timeout=30 --timeout=30 -t 1 -L -O - ) || echo "[!] wget failed @ ${src}" 1>&2
       fi
       echo "${DOWNLOAD_CMD}" \
         | sed 's/\r/\n/' \
@@ -106,7 +111,7 @@ function fetch() {
         | grep -v '\slocalhost\s*' \
         | sed 's/\s*\#.*//g' \
         | sed 's/\s\+/\t/g' \
-        >> "${TMPDIR}/hosts.downloaded" && (( count++ ))
+        >> "${TMPDIR}/hosts.downloaded" && ((count+=1)) || :
         # Download and cleanup:
         # - replace \r\n to unix \n
         # - remove leading whitespaces.
@@ -126,21 +131,21 @@ function fetch() {
     trap '' EXIT
     exit 1
   else
-    echo "[i] Downloaded hosts [${count}/${tcount}]"
+    echo "[i] Downloaded hosts [${count}/${tcount}]."
   fi
   return 0
 }
 
 
 function build() {
-## Construct the hosts file
-  # Sort the hosts according to the alphabet [a-z]
+  ## Construct the hosts file.
+  # Sort the hosts according to the alphabet. [a-z]
   uniq <(sort "${TMPDIR}/hosts.downloaded") > "${TMPDIR}/hosts.adservers" || exit 1
 
   # fist lines of /etc/hosts
   echo "[i] Adding original hosts file from ${HOSTSORIG}"
 
-  # Write header information to tmp folder
+  # Write header information to tmp folder.
   (cat >> "${TMPDIR}/hosts.header" <<EOF
 # [!] This file will be updated by the ad-block-script called adaway-linux.
 # [!] If you want to edit /etc/hosts, please edit the original file in ${HOSTSORIG}.
@@ -148,28 +153,29 @@ function build() {
 
 EOF
 ) || exit 1
-  # Add content of original hosts file
+  # Add content of original hosts file.
   cat "${HOSTSORIG}" >> "${TMPDIR}/hosts.header" || exit 1
 
-  # Append heading to hosts file
+  # Append heading to hosts file.
   (cat >> "${TMPDIR}/hosts.header" <<EOF
 
 # Ad Servers: added with ${SCRIPT_DIR}/adaway-linux.sh
 
 EOF
 ) || exit 1
-  # Build the hosts file from header and downloaded hosts
+  # Build the hosts file from header and downloaded hosts.
   cat "${TMPDIR}/hosts.header" "${TMPDIR}/hosts.adservers" > "${TMPDIR}/hosts" || exit 1
   return 0
 }
 
 
 function apply() {
-## Apply the hosts file to the system
+  ## Apply the hosts file to the system.
   echo "[i] Moving new hosts file to /etc/hosts"
   mv "${TMPDIR}/hosts" /etc/hosts || exit 1
   return 0
 }
+
 
 case "${1}" in
 
