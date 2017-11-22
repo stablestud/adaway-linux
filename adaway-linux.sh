@@ -17,14 +17,14 @@ TMPDIR="/tmp/adaway-linux"
 # Get the location of the script
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 
-trap error ERR  # Trap errors and runs function error
-trap error EXIT # Trap exit and runs function error
+trap error ERR  # Trap errors and runs error function
+trap error EXIT # Trap exit and runs error function
 
 function root() {
 ## Checks for root
   if [ "${UID}" != "0" ] ; then
     echo "[!] This script must be run as root." 1>&2
-    trap '' EXIT # Unhook exit - exit 1 instantly terminates the script after this
+    trap '' EXIT # Unhook exit - exit 1 will now instantly terminates the script
     exit 1
   fi
   return 0
@@ -87,13 +87,16 @@ function prepare() {
 function fetch() {
 ## Download and save the hosts
   # Add domains from hosts-server listed in hostssources.lst
+  declare -i count=0;
+  declare -i tcount=0;
   while read src; do
+    (( tcount++ ))
     if [[ "${src}" != "#"* ]] ; then
       echo "[i] Downloading and cleaning up ${src}"
       if type curl 2>/dev/null 1>&2; then # Checks whether curl is installed, if not switch to wget.
-        DOWNLOAD_CMD=$(curl --progress-bar -L --connect-timeout 20 --retry 2 "${src}" )
+        DOWNLOAD_CMD=$(curl --progress-bar -L --connect-timeout 30 --retry 1 "${src}" )
       else
-        DOWNLOAD_CMD=$(wget "${src}" -nv --show-progress --read-timeout=20 --timeout=20 -t 2 -L -O - )
+        DOWNLOAD_CMD=$(wget "${src}" -nv --show-progress --read-timeout=30 --timeout=30 -t 1 -L -O - )
       fi
       echo "${DOWNLOAD_CMD}" \
         | sed 's/\r/\n/' \
@@ -103,7 +106,7 @@ function fetch() {
         | grep -v '\slocalhost\s*' \
         | sed 's/\s*\#.*//g' \
         | sed 's/\s\+/\t/g' \
-        >> "${TMPDIR}/hosts.downloaded"
+        >> "${TMPDIR}/hosts.downloaded" && (( count++ ))
         # Download and cleanup:
         # - replace \r\n to unix \n
         # - remove leading whitespaces.
@@ -119,9 +122,11 @@ function fetch() {
 
   # Checks if any hosts were downloaded.
   if [ ! -e "${TMPDIR}/hosts.downloaded" ] || [ ! -s "${TMPDIR}/hosts.downloaded" ]; then
-    echo "[!] No data obtained. Exiting..." 1>&2
+    echo "[!] No data obtained [${count}/${tcount}]. Exiting..." 1>&2
     trap '' EXIT
     exit 1
+  else
+    echo "[i] Downloaded hosts [${count}/${tcount}]"
   fi
   return 0
 }
