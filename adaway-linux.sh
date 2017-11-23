@@ -23,6 +23,18 @@ set -o errtrace
 trap 'error ${LINENO} $?' ERR EXIT  # Trap errors and runs error function.
 
 
+function error() {
+  ## To catch unpredicted errors and exits.
+  echo "${0}: line ${1}: exit ${2}"
+  echo "[!] Upps, something went wrong." 1>&2
+  echo "[@] Please report bugs to:" 1>&2
+  echo "[@] https://github.com/sedrubal/adaway-linux/issues" 1>&2
+  cleanup # Execute the cleanup function.
+  trap '' EXIT
+  exit 1
+}
+
+
 function root() {
   ## Checks for root.
   if [ "${UID}" != "0" ] ; then
@@ -39,18 +51,6 @@ function cleanup() {
   echo "[i] Cleaning up..."
   rm -rf "${TMPDIR}" 1>/dev/null 2>&1  # Remove the temporary folder.
   return 0
-}
-
-
-function error() {
-  ## To catch unpredicted errors and exits.
-  echo "${0}: line ${1}: exit ${2}"
-  echo "[!] Upps, something went wrong." 1>&2
-  echo "[@] Please report bugs to:" 1>&2
-  echo "[@] https://github.com/sedrubal/adaway-linux/issues" 1>&2
-  cleanup # Execute the cleanup function.
-  trap '' EXIT
-  exit 1
 }
 
 
@@ -183,7 +183,7 @@ case "${1}" in
     helpme
     ;;
 
-  -s | --simulate )
+  -s | --simulate | --dry-run )
     root
     prepare
     fetch
@@ -200,8 +200,8 @@ case "${1}" in
     cleanup
     ;;
   * )
-    echo "[i] Usage: ${0}  but without ${1}"
-    echo "   ${0} --help for more information"
+    echo "${0}: unknown option ${1}" 1>&2
+    echo "Run »${0} -h« or »${0} --help« to get further information."
     trap '' EXIT
     exit 1
     ;;
