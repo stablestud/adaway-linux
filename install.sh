@@ -29,8 +29,7 @@ function error() {
   ## To catch unpredicted errors and exits.
   echo ""
   echo "[!] Upps, something went wrong." 1>&2
-  echo "${0}: line ${1}: exit ${2}"
-  echo "${0} ${parameters}: failed"
+  echo "${0} ${parameters}: line ${1}: exit ${2}" 1>&2
   echo "[@] Please report bugs to:" 1>&2
   echo "[@] https://github.com/sedrubal/adaway-linux/issues" 1>&2
   trap '' EXIT
@@ -84,7 +83,7 @@ function install() {
   echo "Welcome to the install-script for adaway-linux."
   echo "[!] Please run this only ONCE! Cancel, if you already modified /etc/hosts by adaway-linux.sh."
   if [ ! -n "${answer}" ] ; then
-    read -r -p "[?] Proceed? [Y/n] " REPLY
+    read -r -p "[?] Proceed? [Y/n] " REPLY || exit 1
   else
     REPLY="${answer}"
   fi
@@ -96,7 +95,7 @@ function install() {
         echo "[i] First I will backup the original /etc/hosts to ${HOSTS_ORIG}."
         # Check if /etc/.hosts.original already exist
         if [ -e "${HOSTS_ORIG}" ] ; then
-          echo "[!] Backup of /etc/hosts already exist. To remove run: »${0} -u«" 1>&2
+          echo "[!] Backup of /etc/hosts already exist. To remove run: »${0} -r«" 1>&2
           trap '' EXIT
           exit 1
         fi
@@ -121,7 +120,7 @@ function install() {
 
       # Add scheduler
       if [ ! -n "${scheduler}" ] ; then
-        read -r -p "[?] Create a cronjob/systemd-service which updates /etc/hosts with new adservers once a week? [systemd/cronjob/N] " REPLY
+        read -r -p "[?] Create a cronjob/systemd-service which updates /etc/hosts with new adservers once a week? [systemd/cronjob/N] " REPLY || exit 1
       else
         REPLY=${scheduler}
       fi
@@ -259,7 +258,7 @@ function systemd() {
       echo "[Install]" >> "${SYSTEMD_DIR}/adaway-linux.timer"
       echo "WantedBy=timers.target" >> "${SYSTEMD_DIR}/adaway-linux.timer"
 
-      chmod u=rw,g=r,o=r "${SYSTEMD_DIR}/adaway-linux."*
+      chmod u=rw,g=r,o=r "${SYSTEMD_DIR}/adaway-linux."* || exit 1
 
       # Enable the schedule
       systemctl enable adaway-linux.timer && systemctl start adaway-linux.timer && echo "[i] Systemd service succesfully initialized." || return 1
@@ -337,7 +336,7 @@ case ${action} in
     remove
     ;;
   * )
-    echo "${0}: require either --install or --remove"
+    echo "${0}: require either --install or --remove" 1>&2
     echo "Try »${0} -h« or »${0} --help« to get further information."
     trap '' EXIT
     exit 1

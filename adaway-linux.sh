@@ -25,8 +25,8 @@ trap 'error ${LINENO} $?' ERR EXIT  # Trap errors and runs error function.
 
 function error() {
   ## To catch unpredicted errors and exits.
-  echo "${0}: line ${1}: exit ${2}"
   echo "[!] Upps, something went wrong." 1>&2
+  echo "${0} ${parameters}: line ${1}: exit ${2}"
   echo "[@] Please report bugs to:" 1>&2
   echo "[@] https://github.com/sedrubal/adaway-linux/issues" 1>&2
   cleanup # Execute the cleanup function.
@@ -49,7 +49,8 @@ function root() {
 function cleanup() {
   ## Clean leftovers which are not required anymore.
   echo "[i] Cleaning up..."
-  rm -rf "${TMPDIR}" 1>/dev/null 2>&1  # Remove the temporary folder.
+  # Remove the temporary folder.
+  rm -rf "${TMPDIR}" 1>/dev/null 2>&1 || :
   return 0
 }
 
@@ -176,7 +177,7 @@ function apply() {
   return 0
 }
 
-
+parameters="${@}"
 case "${1}" in
 
   -h | --help )
