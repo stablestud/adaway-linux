@@ -1,0 +1,2 @@
+language: bash
+script: bats --tap install.bats

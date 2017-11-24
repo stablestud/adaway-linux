@@ -305,7 +305,7 @@ for I in "$@"; do
     -[Yy] | --[Yy][Ee][Ss] )
       answer="yes"
       ;;
-    -[Nn] | [Nn][Oo] )
+    -[Nn] | --[Nn][Oo] )
       answer="no"
       ;;
     -S | --systemd )
@@ -336,6 +336,11 @@ case ${action} in
     remove
     ;;
   * )
+    if [ "${#}" -eq 0 ]; then
+      :
+    else
+      echo "${0}: selected options: ${@}"
+    fi
     echo "${0}: require either --install or --remove" 1>&2
     echo "Try »${0} -h« or »${0} --help« to get further information."
     trap '' EXIT
